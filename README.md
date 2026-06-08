@@ -12,6 +12,10 @@ and more.
   (WASM). Your compose file is never uploaded anywhere.
 - **CI-ready** — one exit code gates your pipeline; the same binary runs on your laptop.
 
+> ⚠️ **Early preview — actively developed.** Today Sentinel scans **Docker Compose**.
+> Broader coverage (Dockerfiles, Kubernetes manifests, and more) is on the way toward
+> the first tagged release. There is **no stable release yet** — build from source to try it.
+
 ## Install
 
 From source (Rust toolchain):
@@ -22,8 +26,7 @@ cargo install --git https://github.com/madrainbo/sentinel sentinel
 cargo install --path crates/cli
 ```
 
-Or download a prebuilt binary for your platform from the
-[Releases](https://github.com/madrainbo/sentinel/releases) page (no toolchain needed).
+Prebuilt binaries and a GitHub Action will be published with the first tagged release.
 
 ## Usage
 
@@ -34,10 +37,12 @@ sentinel scan docker-compose.yml --format json    # machine-readable report
 sentinel scan docker-compose.yml --fail-on high   # exit 1 if any High/Critical (CI gate)
 ```
 
-## Use in CI (GitHub Actions)
+## Use in CI (GitHub Actions) — *coming with the first release*
+
+Once the first version is tagged, a one-line Action will gate your pipeline:
 
 ```yaml
-- uses: madrainbo/sentinel@v0.1.0
+- uses: madrainbo/sentinel@v0.1.0      # available after the first release
   with:
     path: docker-compose.yml
     fail-on: high      # fail the job on any High/Critical finding
