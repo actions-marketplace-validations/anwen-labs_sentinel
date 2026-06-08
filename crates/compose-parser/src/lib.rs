@@ -357,27 +357,48 @@ fn emit_port(
 }
 
 fn parse_volume(b: &mut Builder, svc: &str, svc_id: &str, path: &str, v: &Yaml) {
+    // Long syntax: a mapping with type/source/target/read_only.
+    if v.as_hash().is_some() {
+        if let (Some(source), Some(target)) = (v["source"].as_str(), v["target"].as_str()) {
+            let read_only = v["read_only"].as_bool().unwrap_or(false);
+            emit_volume(b, svc, svc_id, path, source, target, read_only);
+        }
+        return;
+    }
+
+    // Short syntax: "source:target[:mode]".
     let spec = match v.as_str() {
         Some(s) => s.to_string(),
-        None => return, // long syntax deferred
+        None => return,
     };
     let parts: Vec<&str> = spec.split(':').collect();
     if parts.len() < 2 {
-        return; // anonymous volume; not a bind mount
+        return; // anonymous volume; nothing to assess
     }
-    let source = parts[0].to_string();
-    let target = parts[1].to_string();
     let read_only = parts.get(2).map(|m| *m == "ro").unwrap_or(false);
+    emit_volume(b, svc, svc_id, path, parts[0], parts[1], read_only);
+}
 
-    let id = format!("mount:{svc}:{source}->{target}");
+/// Emit a Mount (bind mount with a host path) or a Volume (named volume). Only
+/// bind mounts carry a host path, so only they are subject to host-path rules.
+fn emit_volume(b: &mut Builder, svc: &str, svc_id: &str, path: &str, source: &str, target: &str, read_only: bool) {
+    let is_bind =
+        source.starts_with('/') || source.starts_with('.') || source.starts_with('~');
+
+    let (id, kind) = if is_bind {
+        (format!("mount:{svc}:{source}->{target}"), EntityKind::Mount)
+    } else {
+        (format!("volume:{source}"), EntityKind::Volume)
+    };
+
     let mut a = BTreeMap::new();
-    a.insert("source".into(), AttrValue::Str(source));
-    a.insert("target".into(), AttrValue::Str(target));
+    a.insert("source".into(), AttrValue::Str(source.to_string()));
+    a.insert("target".into(), AttrValue::Str(target.to_string()));
     a.insert("read_only".into(), AttrValue::Bool(read_only));
 
     b.entity(Entity {
         id: id.clone(),
-        kind: EntityKind::Mount,
+        kind,
         attributes: a,
         provenance: Provenance {
             source_path: path.to_string(),
@@ -470,6 +491,23 @@ mod tests {
         let a = parse(yaml).model_hash();
         let b = parse(yaml).model_hash();
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn long_syntax_volume_is_parsed_as_bind_mount() {
+        let yaml = "services:\n  app:\n    image: nginx:1.25\n    volumes:\n      - type: bind\n        source: /var/run/docker.sock\n        target: /var/run/docker.sock\n";
+        let fm = parse(yaml);
+        assert!(fm.entities.iter().any(|e| e.kind == EntityKind::Mount
+            && e.attr("source").and_then(|v| v.as_str()) == Some("/var/run/docker.sock")));
+    }
+
+    #[test]
+    fn named_volume_is_not_a_host_mount() {
+        let yaml = "services:\n  app:\n    image: nginx:1.25\n    volumes:\n      - db-data:/var/lib/mysql\n";
+        let fm = parse(yaml);
+        // named volume -> Volume kind, not a host bind Mount
+        assert!(fm.entities.iter().any(|e| e.kind == EntityKind::Volume && e.id == "volume:db-data"));
+        assert!(!fm.entities.iter().any(|e| e.kind == EntityKind::Mount));
     }
 
     #[test]

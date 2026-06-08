@@ -8,9 +8,20 @@ use fact_model::{AttrValue, EntityKind, FactModel};
 
 pub const PACK_ID: &str = "sentinel-core";
 
-const DANGEROUS_CAPS: &[&str] =
-    &["SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE", "SYS_MODULE", "DAC_READ_SEARCH"];
-const SENSITIVE_PORTS: &[i64] = &[5432, 3306, 6379, 27017, 9200, 5984, 11211, 2375, 2376];
+const DANGEROUS_CAPS: &[&str] = &[
+    "SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE", "SYS_MODULE", "DAC_READ_SEARCH", "DAC_OVERRIDE",
+    "SYS_RAWIO", "BPF", "SYS_BOOT", "SYS_TIME", "MAC_ADMIN", "MAC_OVERRIDE", "AUDIT_CONTROL",
+    "LINUX_IMMUTABLE",
+];
+const SENSITIVE_PORTS: &[i64] = &[
+    2375, 2376, // docker daemon
+    5432, 5433, 3306, 1433, 1521, // SQL databases
+    6379, 6380, 11211, // redis / memcached
+    27017, 28015, 9042, 7000, 7001, 26257, 8123, // mongo / rethink / cassandra / cockroach / clickhouse
+    9200, 9300, 5984, // elasticsearch / couchdb
+    2181, 2379, 2380, 9092, 5672, 15672, // zookeeper / etcd / kafka / rabbitmq
+    8500, // consul
+];
 
 /// Host paths that should never be bind-mounted into a container (besides the
 /// Docker socket, which has its own dedicated rule R1).

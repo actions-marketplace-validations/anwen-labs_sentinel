@@ -1,0 +1,12 @@
+# Docker socket mounted via Compose long-syntax volume. The parser must handle
+# the mapping form, and R1 must still catch it.
+# EXPECT: Critical DOCKER-SOCKET-MOUNT
+services:
+  app:
+    image: nginx@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    user: "10001"
+    read_only: true
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
