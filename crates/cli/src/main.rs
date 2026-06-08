@@ -11,7 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use compose_parser::try_parse;
-use engine::{full_report_json, pack_version_hash, run_pack, Pack, ReportCore, Severity};
+use engine::{full_report_json, pack_version_hash, run_pack, sarif_json, Pack, ReportCore, Severity};
 use pack_sentinel_core::SentinelCorePack;
 
 #[derive(Parser)]
@@ -29,6 +29,16 @@ struct Cli {
 enum Command {
     /// Scan a Docker Compose file for security misconfigurations.
     Scan(ScanArgs),
+    /// Re-check that a saved JSON report reproduces its digest for a compose file.
+    Verify(VerifyArgs),
+}
+
+#[derive(Args)]
+struct VerifyArgs {
+    /// Path to a saved JSON report (from `sentinel scan --format json`).
+    report: String,
+    /// Path to the compose file to re-scan, or "-" to read from stdin.
+    compose: String,
 }
 
 #[derive(Args)]
@@ -53,6 +63,7 @@ struct ScanArgs {
 enum Format {
     Text,
     Json,
+    Sarif,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -80,6 +91,7 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
         Command::Scan(args) => scan(args),
+        Command::Verify(args) => verify(args),
     }
 }
 
@@ -137,6 +149,10 @@ fn scan(args: ScanArgs) -> ExitCode {
                 full_report_json(&core, &report_id, now).to_canonical_string()
             );
         }
+        Format::Sarif => {
+            let uri = if args.path == "-" { "docker-compose.yml" } else { args.path.as_str() };
+            println!("{}", sarif_json(&findings, uri).to_canonical_string());
+        }
         Format::Text => print_text(&args, &model, &findings, &verdict, &digest),
     }
 
@@ -193,4 +209,70 @@ fn print_text(
         c.info
     );
     println!("digest:  {digest}");
+}
+
+fn verify(args: VerifyArgs) -> ExitCode {
+    let report_text = match std::fs::read_to_string(&args.report) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("error: cannot read {}: {e}", args.report);
+            return ExitCode::from(2);
+        }
+    };
+    let report: serde_json::Value = match serde_json::from_str(report_text.trim_start_matches('\u{feff}')) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("error: invalid report JSON: {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let claimed = match report
+        .get("envelope")
+        .and_then(|e| e.get("report_digest"))
+        .and_then(|d| d.as_str())
+    {
+        Some(s) => s.to_string(),
+        None => {
+            eprintln!("error: report has no envelope.report_digest");
+            return ExitCode::from(2);
+        }
+    };
+
+    let input = match read_input(&args.compose) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let model = match try_parse(&input) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let pack = SentinelCorePack::new();
+    let findings = run_pack(&pack, &model);
+    let verdict = pack.verdict(&findings);
+    let core = ReportCore {
+        model: &model,
+        pack_id: pack.id().to_string(),
+        pack_version_hash: pack_version_hash(&pack),
+        findings: &findings,
+        verdict: &verdict,
+    };
+    let recomputed = core.report_digest();
+
+    if recomputed == claimed {
+        println!("verified: report reproduces");
+        println!("digest: {recomputed}");
+        ExitCode::SUCCESS
+    } else {
+        eprintln!("MISMATCH — report does not reproduce");
+        eprintln!("  claimed:    {claimed}");
+        eprintln!("  recomputed: {recomputed}");
+        eprintln!("(digests differ if the compose file, engine version, or pack changed)");
+        ExitCode::from(1)
+    }
 }

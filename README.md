@@ -34,8 +34,22 @@ Prebuilt binaries and a GitHub Action will be published with the first tagged re
 sentinel scan docker-compose.yml                  # human-readable findings
 cat docker-compose.yml | sentinel scan -          # read from stdin
 sentinel scan docker-compose.yml --format json    # machine-readable report
+sentinel scan docker-compose.yml --format sarif   # SARIF for GitHub code scanning
 sentinel scan docker-compose.yml --fail-on high   # exit 1 if any High/Critical (CI gate)
+sentinel verify report.json docker-compose.yml    # re-check a saved report reproduces
 ```
+
+**SARIF** output drops findings straight into the GitHub Security tab:
+
+```yaml
+- run: sentinel scan docker-compose.yml --format sarif > sentinel.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: sentinel.sarif
+```
+
+**`verify`** re-runs the scan and checks the result reproduces the report's
+`report_digest` — the content-addressing guarantee, usable by an auditor.
 
 ## Use in CI (GitHub Actions) — *coming with the first release*
 

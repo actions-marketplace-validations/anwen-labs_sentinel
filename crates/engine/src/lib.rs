@@ -226,6 +226,125 @@ impl<'a> ReportCore<'a> {
     }
 }
 
+fn sarif_level(sev: Severity) -> &'static str {
+    match sev {
+        Severity::Critical | Severity::High => "error",
+        Severity::Medium => "warning",
+        Severity::Low | Severity::Info => "note",
+    }
+}
+
+fn sarif_security_severity(sev: Severity) -> &'static str {
+    match sev {
+        Severity::Critical => "9.0",
+        Severity::High => "7.5",
+        Severity::Medium => "5.0",
+        Severity::Low => "3.0",
+        Severity::Info => "1.0",
+    }
+}
+
+/// Render findings as SARIF 2.1.0 — the format GitHub code scanning ingests
+/// (findings show up in the Security tab and as PR annotations).
+pub fn sarif_json(findings: &[Finding], file_uri: &str) -> Json {
+    // Unique rule descriptors, first occurrence wins (stable order).
+    let mut seen: Vec<String> = Vec::new();
+    let mut rules: Vec<Json> = Vec::new();
+    for f in findings {
+        if seen.iter().any(|r| r == &f.rule_id) {
+            continue;
+        }
+        seen.push(f.rule_id.clone());
+        rules.push(Json::Obj(vec![
+            ("id".into(), Json::Str(f.rule_id.clone())),
+            (
+                "shortDescription".into(),
+                Json::Obj(vec![("text".into(), Json::Str(f.message.clone()))]),
+            ),
+            (
+                "helpUri".into(),
+                Json::Str("https://github.com/madrainbo/sentinel/blob/main/CONTROLS.md".into()),
+            ),
+            (
+                "properties".into(),
+                Json::Obj(vec![(
+                    "tags".into(),
+                    Json::Arr(f.controls.iter().cloned().map(Json::Str).collect()),
+                )]),
+            ),
+        ]));
+    }
+
+    let results: Vec<Json> = findings
+        .iter()
+        .map(|f| {
+            Json::Obj(vec![
+                ("ruleId".into(), Json::Str(f.rule_id.clone())),
+                ("level".into(), Json::Str(sarif_level(f.severity).into())),
+                (
+                    "message".into(),
+                    Json::Obj(vec![(
+                        "text".into(),
+                        Json::Str(format!("{} (evidence: {})", f.message, f.evidence.join(", "))),
+                    )]),
+                ),
+                (
+                    "locations".into(),
+                    Json::Arr(vec![Json::Obj(vec![(
+                        "physicalLocation".into(),
+                        Json::Obj(vec![
+                            (
+                                "artifactLocation".into(),
+                                Json::Obj(vec![("uri".into(), Json::Str(file_uri.to_string()))]),
+                            ),
+                            (
+                                "region".into(),
+                                Json::Obj(vec![("startLine".into(), Json::Int(1))]),
+                            ),
+                        ]),
+                    )])]),
+                ),
+                (
+                    "properties".into(),
+                    Json::Obj(vec![(
+                        "security-severity".into(),
+                        Json::Str(sarif_security_severity(f.severity).into()),
+                    )]),
+                ),
+            ])
+        })
+        .collect();
+
+    Json::Obj(vec![
+        (
+            "$schema".into(),
+            Json::Str("https://json.schemastore.org/sarif-2.1.0.json".into()),
+        ),
+        ("version".into(), Json::Str("2.1.0".into())),
+        (
+            "runs".into(),
+            Json::Arr(vec![Json::Obj(vec![
+                (
+                    "tool".into(),
+                    Json::Obj(vec![(
+                        "driver".into(),
+                        Json::Obj(vec![
+                            ("name".into(), Json::Str("sentinel".into())),
+                            ("version".into(), Json::Str(ENGINE_VERSION.into())),
+                            (
+                                "informationUri".into(),
+                                Json::Str("https://github.com/madrainbo/sentinel".into()),
+                            ),
+                            ("rules".into(), Json::Arr(rules)),
+                        ]),
+                    )]),
+                ),
+                ("results".into(), Json::Arr(results)),
+            ])]),
+        ),
+    ])
+}
+
 /// Build the full report JSON: a non-hashed `envelope` wrapping the hashed
 /// `core` (ADR 0003). `report_id` and `generated_at_unix` are operational
 /// metadata and are deliberately NOT part of the digest.
