@@ -1,0 +1,8 @@
+{
+  "name": "sentinel-scanner",
+  "description": "Deterministic IaC security scanning: scan Compose/Dockerfile/K8s/GHA/Terraform/.env, fix findings by source line, re-scan until CLEARED, verify digests.",
+  "version": "0.1.0",
+  "author": {
+    "name": "madrainbo"
+  }
+}

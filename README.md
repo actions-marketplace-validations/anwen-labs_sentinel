@@ -18,9 +18,8 @@ hardcoded keys, and more.
   uploaded anywhere; the tool makes no network calls.
 - **CI-ready** — one exit code gates your pipeline; the same binary runs on your laptop.
 
-> ⚠️ **Early preview — actively developed.** There is **no stable release yet** —
-> build from source to try the CLI. Prebuilt binaries and the GitHub Action arrive
-> with the first tagged release.
+> ⚠️ **Early release — actively developed.** APIs and rule sets may still change
+> between versions; findings format is stable within a minor series.
 
 ## What it scans
 
@@ -40,7 +39,19 @@ deep-link into it). Control mappings (CWE, CIS): **[CONTROLS.md](CONTROLS.md)**.
 
 ## Install
 
-From source (requires the [Rust toolchain](https://rustup.rs) and Git):
+**Prebuilt binary** (no toolchain needed) — download the archive for your platform
+from [Releases](https://github.com/madrainbo/sentinel/releases/latest)
+(Linux x86_64/aarch64 · macOS x86_64/aarch64 · Windows x86_64), check the
+`.sha256`, and put `sentinel` on your `PATH`:
+
+```sh
+curl -fsSLO https://github.com/madrainbo/sentinel/releases/download/v0.1.0/sentinel-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
+curl -fsSLO https://github.com/madrainbo/sentinel/releases/download/v0.1.0/sentinel-v0.1.0-x86_64-unknown-linux-gnu.sha256
+sha256sum -c <(awk '{print $1"  sentinel-v0.1.0-x86_64-unknown-linux-gnu.tar.gz"}' sentinel-v0.1.0-x86_64-unknown-linux-gnu.sha256)
+tar xzf sentinel-v0.1.0-x86_64-unknown-linux-gnu.tar.gz && sudo mv sentinel /usr/local/bin/
+```
+
+**From source** (requires the [Rust toolchain](https://rustup.rs) and Git):
 
 ```sh
 cargo install --git https://github.com/madrainbo/sentinel sentinel
@@ -78,12 +89,12 @@ sentinel rules                                    # the full rule catalog as Mar
 **`verify`** re-runs the scan and checks the result reproduces the report's
 `report_digest` — the content-addressing guarantee, usable by an auditor.
 
-## Use in CI (GitHub Actions) — *coming with the first release*
+## Use in CI (GitHub Actions)
 
-Once the first version is tagged, a one-line Action will gate your pipeline:
+One line gates your pipeline:
 
 ```yaml
-- uses: madrainbo/sentinel@v0.1.0      # available after the first release
+- uses: madrainbo/sentinel@v0.1.0
   with:
     path: docker-compose.yml
     fail-on: high      # fail the job on any High/Critical finding
@@ -91,6 +102,21 @@ Once the first version is tagged, a one-line Action will gate your pipeline:
 
 The Action downloads a pinned, checksum-verified prebuilt binary for the runner and
 runs the **same** `sentinel scan` you run locally — your CI never compiles anything.
+
+## Use with Claude Code (agent skill)
+
+This repo is also a Claude Code plugin marketplace. Installing it teaches the agent
+to scan IaC files with Sentinel, fix findings by source line, re-scan until
+`CLEARED`, and verify the report digest — deterministic verdicts instead of
+model judgment:
+
+```
+/plugin marketplace add madrainbo/sentinel
+/plugin install sentinel-scanner@sentinel
+```
+
+The skill lives in [`skills/scan-iac-with-sentinel/`](skills/scan-iac-with-sentinel/SKILL.md)
+and works with any [agentskills.io](https://agentskills.io)-compatible agent.
 
 ## How it works
 
