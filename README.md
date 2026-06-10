@@ -5,6 +5,12 @@
 misconfigurations — exposed Docker sockets, default credentials, privileged
 containers, `curl | sh` in builds, unpinned images, and more.
 
+> ### 🚀 [Try the live demo →](https://sentinel-engine-ggaj.onrender.com/)
+> Paste a Docker Compose file, Dockerfile, Kubernetes manifest, GitHub Actions
+> workflow, Terraform file, or `.env` and scan it **entirely in your browser**
+> (WebAssembly — nothing is uploaded). The demo runs the latest engine; the newer
+> scanners (Kubernetes, GitHub Actions, Terraform, secrets) land in this repo next.
+
 - **Deterministic** — same input always produces the same findings and the same
   `report_digest` (a real SHA-256 over the normalized facts + engine/pack versions +
   verdict). No LLM, no flakiness, fully auditable.
@@ -12,9 +18,10 @@ containers, `curl | sh` in builds, unpinned images, and more.
   uploaded anywhere; the tool makes no network calls.
 - **CI-ready** — one exit code gates your pipeline; the same binary runs on your laptop.
 
-> ⚠️ **Early preview — actively developed.** Sentinel scans **Docker Compose** and
-> **Dockerfiles** today; Kubernetes manifests and more are on the way. There is **no
-> stable release yet** — build from source to try it.
+> ⚠️ **Early preview — actively developed.** This repo's CLI scans **Docker Compose**
+> and **Dockerfiles** today; Kubernetes manifests and more are on the way (already live
+> in the [demo](https://sentinel-engine-ggaj.onrender.com/)). There is **no stable
+> release yet** — build from source to try the CLI.
 
 ## Install
 
