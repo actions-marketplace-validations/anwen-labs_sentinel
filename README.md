@@ -37,6 +37,25 @@ per-rule reference — what each finds, why it matters, how to fix it — in
 **[RULES.md](RULES.md)** (generated from the engine itself; findings and SARIF
 deep-link into it). Control mappings (CWE, CIS): **[CONTROLS.md](CONTROLS.md)**.
 
+## Scope — one layer, not your whole security program
+
+Security is layered. Sentinel does **configuration misconfiguration** deterministically
+and with zero false positives — we'd rather be precise about a slice than vague about
+everything. Pair it with the tools below for defense in depth.
+
+**Sentinel catches:** misconfigurations across the six formats above (70 rules) —
+container escape, exposed services, default/leaked credentials, over-broad permissions,
+supply-chain gaps — with source-line references, CWE/CIS mappings, and a reproducible
+digest.
+
+**Sentinel does _not_ (use it alongside):**
+
+- Vulnerable **dependencies** / CVEs → Dependabot, Trivy, `cargo audit`
+- Source-code vulnerabilities (**SAST**) → CodeQL, Semgrep
+- Secrets in **git history** — it scans the file you give it, not your commits → gitleaks, trufflehog
+- **Runtime** threats → Falco, your EDR
+- _Today:_ one file per invocation; Helm / templated YAML isn't rendered yet (whole-repo and Helm are on the roadmap)
+
 ## Install
 
 **Prebuilt binary** (no toolchain needed) — download the archive for your platform
